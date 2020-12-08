@@ -1,5 +1,3 @@
-!pip install nltk
-
 import json
 import joblib
 import numpy as np
@@ -205,6 +203,8 @@ def HasMultipleNumPeriod(s):
     return False
 
 def ExtractFeatures(s):
+    tk = WhitespaceTokenizer() 
+
     tokens = tk.tokenize(s)
     tokens = list(filter(lambda x: not IsUrl(x), tokens))
     dp_list = []
@@ -245,8 +245,8 @@ def run(raw_data):
     # Get the input data as a numpy array
     string = json.loads(raw_data)['data']
 
-    data = ExtractFeatures(string)
+    data = np.array(ExtractFeatures(string))
     # Get a prediction from the model
-    predictions = model.predict(data)
+    predictions = model.predict(data.reshape(1,-1))
     # Return the predictions as any JSON serializable format
     return predictions.tolist()
