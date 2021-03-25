@@ -41,4 +41,4 @@ run.log('accuracy', np.float(acc))
 
 os.makedirs('outputs', exist_ok=True)
 # note file saved in the outputs folder is automatically uploaded into experiment record
-joblib.dump(value=clf, filename='outputs/ModelV2.pkl')
+joblib.dump(value=clf, filename='outputs/PipelineModel.pkl')
