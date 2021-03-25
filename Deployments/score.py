@@ -5,6 +5,8 @@ import joblib
 import numpy as np
 from azureml.core.model import Model
 from nltk.tokenize import WhitespaceTokenizer
+from ipaddress import ip_address
+
 
 # Features
 
@@ -81,6 +83,16 @@ def StartLetterEndNonLetter(s):
         return True
     return False
 
+def IsUrl(s):
+    s = str(s)
+    l = len(s)
+    if l > 3:
+        if s[0:4] == "http":
+            return True
+    if l > 4:
+        if s[0:5] == "https":
+            return True
+    return False
 
 # Hostname specific features
 def LengthGTLT(gt, ls, s):
@@ -119,16 +131,6 @@ def ContainsPeriod(s):
             return True
     return False
 
-def IsUrl(s):
-    s = str(s)
-    l = len(s)
-    if l > 3:
-        if s[0:4] == "http":
-            return True
-    if l > 4:
-        if s[0:5] == "https":
-            return True
-    return False
 
 def HasSlash(s):
     s = str(s)
@@ -204,49 +206,104 @@ def HasMultipleNumPeriod(s):
             return True
     return False
 
-def ExtractFeatures(s):
-    tokens = tk.tokenize(s)
-    tokens = list(filter(lambda x: not IsUrl(x), tokens))
-    dp_list = []
-    dp_list.append(True) if True in list(map(lambda x: LowerUnderscoreUpper(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: HasUnderscore(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: LowerUpperLower(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: MultipleLowerUpperLower(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: ExactlyTwoUppercase(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: AllLowerMoreThan(10,x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: AdjacentUppers(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: StartLetterEndNonLetter(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: LengthGTLT(1, 15, x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: IllegalHostnameChars(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: AlphaOrDigit(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: HostIllegalEnding(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: ContainsPeriod(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: HasSlash(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: HasMultipleSlash(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: HasPossibleExtension(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: NumbersThenPeriod(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: AtLeastFourDigits(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: HasPeriodAndSlash(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: HasInstanceNumPeriod(x), tokens)) else dp_list.append(False)
-    dp_list.append(True) if True in list(map(lambda x: HasMultipleNumPeriod(x), tokens)) else dp_list.append(False)
 
-    return dp_list
+def PosTag(s):
+    d = {'CC':1,
+        'CD': 2,
+        'DT': 3,
+        'EX': 4,
+        'FW': 5,
+        'IN': 6,
+        'JJ': 7,
+        'JJR': 8,
+        'JJS': 9,
+        'LS': 10,
+        'MD': 11,
+        'NN': 12,
+        'NNS': 13,
+        'NNP': 14,
+        'NNPS': 15,
+        'PDT': 16,
+        'POS': 17,
+        'PRP': 18,
+        'PRP$': 19,
+        'RB': 20,
+        'RBR': 21,
+        'RBS': 22,
+        'RP': 23,
+        'TO': 24,
+        'UH': 25,
+        'VB': 26,
+        'VBD': 27,
+        'VBG': 28,
+        'VBN': 29,
+        'VBP': 30,
+        'VBZ': 31,
+        'WDT': 32,
+        'WP': 33,
+        'WP$': 34,
+        'WRB': 35
+        }
+    tagged = nltk.pos_tag([s,"test"])
+    return d[tagged[0][1]] if tagged[0][1] in d else 0
+
+
+def ExtractFeatures(x):
+    feature_list = []
+    feature_list.append(LowerUnderscoreUpper(x))
+    feature_list.append(HasUnderscore(x))
+    feature_list.append(LowerUpperLower(x))
+    feature_list.append(MultipleLowerUpperLower(x))
+    feature_list.append(ExactlyTwoUppercase(x))
+    feature_list.append(AllLowerMoreThan(10,x))
+    feature_list.append(AdjacentUppers(x))
+    feature_list.append(StartLetterEndNonLetter(x))
+    feature_list.append(LengthGTLT(1, 15, x))
+    feature_list.append(IllegalHostnameChars(x))
+    feature_list.append(AlphaOrDigit(x))
+    feature_list.append(HostIllegalEnding(x))
+    feature_list.append(ContainsPeriod(x))
+    feature_list.append(HasSlash(x))
+    feature_list.append(HasMultipleSlash(x))
+    feature_list.append(HasPossibleExtension(x))
+    feature_list.append(NumbersThenPeriod(x))
+    feature_list.append(AtLeastFourDigits(x))
+    feature_list.append(HasPeriodAndSlash(x))
+    feature_list.append(HasInstanceNumPeriod(x))
+    feature_list.append(HasMultipleNumPeriod(x))
+    feature_list.append(PosTag(x))
+    return feature_list
 
     
 # Called when the service is loaded
 def init():
     global model
     # Get the path to the registered model file and load it
-    model_path = Model.get_model_path('TestModel1')
+    model_path = Model.get_model_path('ModelV2')
     model = joblib.load(model_path)
 
 # Called when a request is received
 def run(raw_data):
     # Get the input data as a numpy array
     string = json.loads(raw_data)['data']
+    tk = WhitespaceTokenizer()
+    tokens = tk.tokenize(string)
+    not_ip = []
+    labels = []
+    found_attributes = {}
 
-    data = ExtractFeatures(string)
-    # Get a prediction from the model
-    predictions = model.predict(data)
+    for token in string.split():
+        try:                
+            ip = ip_address(token)
+            found_attributes[token] = "IP"
+        except:
+            not_ip.append(log)
+    for i,point in enumerate(not_ip):
+        features = ExtractFeatures(point)
+        labels.append((i,model.predict([features])))
+    for label in labels:
+        if label[1][0] != 'nothing':
+            found_attributes[not_ip[label[0]]] = label[1][0]
+
     # Return the predictions as any JSON serializable format
-    return predictions.tolist()
+    return found_attributes

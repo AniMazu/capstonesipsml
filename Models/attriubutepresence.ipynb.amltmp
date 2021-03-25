@@ -1,0 +1,784 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "source": [
+        "!pip install nltk"
+      ],
+      "metadata": {
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pandas as pd\r\n",
+        "import numpy as np\r\n",
+        "import json\r\n",
+        "import ast\r\n",
+        "from nltk.tokenize import WhitespaceTokenizer\r\n",
+        "import random\r\n",
+        "from azureml.core import Workspace, Dataset"
+      ],
+      "outputs": [],
+      "execution_count": 117,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615776276942
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# reading a dataset from the datasets registry\r\n",
+        "subscription_id = '9d0dfa04-d2f8-4521-b945-b3a7dbf43946'\r\n",
+        "resource_group = 'CougsInAzure'\r\n",
+        "workspace_name = 'CougsInAzure2'\r\n",
+        "\r\n",
+        "workspace = Workspace(subscription_id, resource_group, workspace_name)\r\n",
+        "\r\n",
+        "dataset = Dataset.get_by_name(workspace, name='V2Dataset')"
+      ],
+      "outputs": [],
+      "execution_count": 114,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615776243796
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ONLY USING FOR TESTING, READING FROM A CSV\r\n",
+        "headers =[\"LowerUnderscoreUpper\", \"HasUnderscore\", \"LowerUpperLower\", \"MultipleLowerUpperLower\", \"ExactlyTwoUppercase\", \"AllLowerMoreThan\",\r\n",
+        "    \"AdjacentUppers\", \"StartLetterEndNonLetter\", \"LengthGTLT\", \"IllegalHostnameChars\", \"AlphaOrDigit\", \"HostIllegalEnding\", \"ContainsPeriod\",\r\n",
+        "    \"HasSlash\", \"HasMultipleSlash\", \"HasPossibleExtension\", \"NumbersThenPeriod\", \"AtLeastFourDigits\", \"HasPeriodAndSlash\", \"HasInstanceNumPeriod\", \r\n",
+        "    \"HasMultipleNumPeriod\", \"Label\"]\r\n",
+        "df = pd.read_csv(\"~/cloudfiles/code/Users/capstonesipsml/Data/token_features.csv\", names=headers, header=0)\r\n",
+        "df['Label'].value_counts()\r\n"
+      ],
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "execution_count": 98,
+          "data": {
+            "text/plain": "nothing       14975\nfilename       8741\nhostname       5025\nusername       3850\nservername      186\nName: Label, dtype: int64"
+          },
+          "metadata": {}
+        }
+      ],
+      "execution_count": 98,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615330088094
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "dataset.to_pandas_dataframe()\r\n"
+      ],
+      "outputs": [],
+      "execution_count": 119,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1613436605184
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# splitting the datasets into positive and negative lists\r\n",
+        "def IsPositive(r):\r\n",
+        "    return True if r[-1] !=\"nothing\" else False\r\n",
+        "def IsNegative(r):\r\n",
+        "    return True if r[-1] == \"nothing\" else False\r\n",
+        "\r\n",
+        "df_list = df.values.tolist()\r\n",
+        "print(df_list[0])\r\n",
+        "\r\n",
+        "positive_dataset = list(filter(IsPositive, df_list))\r\n",
+        "negative_dataset = list(filter(IsNegative, df_list))\r\n",
+        "\r\n",
+        "\r\n",
+        "random.shuffle(positive_dataset)\r\n",
+        "random.shuffle(negative_dataset)\r\n",
+        "\r\n"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "[False, False, False, False, False, False, False, False, True, True, False, False, False, False, False, False, False, False, False, False, False, 'nothing']\n"
+          ]
+        }
+      ],
+      "execution_count": 99,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615330094708
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Combining the dataset into 1\r\n",
+        "dataset = []\r\n",
+        "l = len(negative_dataset) if len(negative_dataset) < len(positive_dataset) else len(positive_dataset)\r\n",
+        "\r\n",
+        "for i in range(0,l):\r\n",
+        "    dataset.append(positive_dataset[i])\r\n",
+        "    dataset.append(negative_dataset[i])\r\n",
+        "print(dataset[:5])\r\n",
+        "print(len(dataset))"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "[[False, False, False, False, False, True, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, 'hostname'], [False, False, False, False, False, False, False, False, True, False, True, False, False, False, False, False, False, False, False, False, False, 'nothing'], [False, False, False, False, False, True, False, False, False, True, False, False, True, True, True, True, False, True, False, False, False, 'filename'], [False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, 'nothing'], [False, False, False, False, False, True, False, False, False, True, False, False, True, True, True, True, False, False, False, False, False, 'filename']]\n",
+            "29950\n"
+          ]
+        }
+      ],
+      "execution_count": 100,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615330097204
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Splitting the dataset into train and test\r\n",
+        "\r\n",
+        "X = list(map(lambda x: x[:-1], dataset))\r\n",
+        "y = list(map(lambda x: x[-1], dataset))\r\n",
+        "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=2)\r\n",
+        "print(len(X))\r\n"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "29950\n"
+          ]
+        }
+      ],
+      "execution_count": 104,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615330112797
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Functions to compute different metrics\r\n",
+        "\r\n",
+        "def calcAccuracy(target, predictions):\r\n",
+        "    total = len(predictions)\r\n",
+        "    correct = 0\r\n",
+        "    for i in range(len(predictions)):\r\n",
+        "        if target[i] == predictions[i]:\r\n",
+        "            correct += 1\r\n",
+        "        accuracy = float(correct) / float(total)\r\n",
+        "    return accuracy\r\n",
+        "\r\n",
+        "def FalsePositivesMultiClass(x_test, y_test, pred):\r\n",
+        "    false_positives = []\r\n",
+        "    for i in range(0, len(x_test)):\r\n",
+        "        if y_test[i] == 'nothing' and pred[i] != 'nothing':\r\n",
+        "            false_positives.append(x_test[i])\r\n",
+        "    return false_positives\r\n",
+        "\r\n",
+        "def FalseNegativesMultiClass(x_test, y_test, pred):\r\n",
+        "    false_negatives = []\r\n",
+        "    for i in range(0,len(x_test)):\r\n",
+        "        if y_test[i] != 'nothing' and pred[i] == 'nothing':\r\n",
+        "            false_negatives.append(x_test[i])\r\n",
+        "    return false_negatives\r\n",
+        "\r\n",
+        "def MislabeledMultiClass(x_test, y_test, pred):\r\n",
+        "    mislabeled = []\r\n",
+        "    for i in range(0,len(x_test)):\r\n",
+        "        if y_test[i] != 'nothing' and pred[i] != 'nothing' and y_test[i] != pred[i]:\r\n",
+        "            mislabeled.append(x_test[i])\r\n",
+        "    return mislabeled\r\n",
+        "\r\n",
+        "def FalsePositives(x_test, y_test, pred):\r\n",
+        "    false_positives = []\r\n",
+        "    for i in range(0, len(x_test)):\r\n",
+        "        if y_test[i] == 0 and pred[i] == 1:\r\n",
+        "            false_positives.append(x_test[i])\r\n",
+        "    return false_positives\r\n",
+        "\r\n",
+        "def FalseNegatives(x_test, y_test, pred):\r\n",
+        "    false_negatives = []\r\n",
+        "    for i in range(0,len(x_test)):\r\n",
+        "        if y_test[i] != 1 and pred[i] == 0:\r\n",
+        "            false_negatives.append(x_test[i])\r\n",
+        "    return false_negatives\r\n",
+        "\r\n",
+        "def PrintResults(classifier, acc, recall, precision):\r\n",
+        "    print(classifier + \" Classifier\")\r\n",
+        "    print(\"Accuracy= \", acc)\r\n",
+        "    print(\"Precision= \", precision)\r\n",
+        "    print(\"Recall= \", recall)"
+      ],
+      "outputs": [],
+      "execution_count": 78,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615328271872
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# BEGIN MACHINE LEARNING MODELS\r\n",
+        "from sklearn.tree import DecisionTreeClassifier\r\n",
+        "from sklearn.neighbors import KNeighborsClassifier\r\n",
+        "from sklearn.linear_model import LogisticRegression\r\n",
+        "from sklearn.naive_bayes import GaussianNB\r\n",
+        "from sklearn.ensemble import RandomForestClassifier\r\n",
+        "from sklearn.model_selection import train_test_split\r\n",
+        "from sklearn.metrics import precision_score\r\n",
+        "from sklearn.metrics import recall_score\r\n",
+        "from sklearn.model_selection import train_test_split\r\n",
+        "from sklearn.metrics import accuracy_score,recall_score\r\n",
+        "from sklearn.neural_network import MLPClassifier"
+      ],
+      "outputs": [],
+      "execution_count": 85,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615328496386
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# DECISION TREE CLASSIFIER\r\n",
+        "dt = DecisionTreeClassifier().fit(X_train, y_train)\r\n",
+        "pred = dt.predict(X_test)\r\n",
+        "acc = calcAccuracy(y_test, pred)\r\n",
+        "#recall = recall_score(y_test, pred,average='macro')\r\n",
+        "#precision = precision_score(y_test, pred, average='macro')\r\n",
+        "PrintResults(\"Decision Tree\", acc, \"N/A\", \"N/A\")\r\n",
+        "\r\n",
+        "false_negatives = FalseNegativesMultiClass(X_test, y_test, pred)\r\n",
+        "false_positives = FalsePositivesMultiClass(X_test, y_test, pred)\r\n",
+        "mislabeled = MislabeledMulitiClass(X_test,y_test,pred)\r\n",
+        "\r\n",
+        "{\"IP\",\"filename\",'servername','username','nothing'}\r\n",
+        "print(f\"\\nFP-> {len(false_positives)} \\nFN-> {len(false_negatives)} \\nMislabeled-> {len(mislabeled)}\")"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Decision Tree Classifier\n",
+            "Accuracy=  0.9529542695265075\n",
+            "Precision=  N/A\n",
+            "Recall=  N/A\n",
+            "\n",
+            "FP-> 126 \n",
+            "FN-> 333 \n",
+            "Mislabeled-> 6\n"
+          ]
+        }
+      ],
+      "execution_count": 105,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615330117745
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# KNN CLASSIFIER\r\n",
+        "knn = KNeighborsClassifier(n_neighbors=7)\r\n",
+        "knn.fit(X_train, y_train)\r\n",
+        "pred = knn.predict(X_test)\r\n",
+        "acc = calcAccuracy(y_test, pred)\r\n",
+        "#recall = recall_score(y_test, pred)\r\n",
+        "#precision = precision_score(y_test, pred)\r\n",
+        "PrintResults(\"KNN\", acc, \"N/A\", \"N/A\")\r\n",
+        "\r\n",
+        "false_negatives = FalseNegativesMultiClass(X_test, y_test, pred)\r\n",
+        "false_positives = FalsePositivesMultiClass(X_test, y_test, pred)\r\n",
+        "mislabeled = MislabeledMultiClass(X_test,y_test,pred)\r\n",
+        "\r\n",
+        "print(f\"\\nFP-> {len(false_positives)} \\nFN-> {len(false_negatives)} \\n Mislabeled-> {len(mislabeled)}\")"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "KNN Classifier\n",
+            "Accuracy=  0.9286726021853501\n",
+            "Precision=  N/A\n",
+            "Recall=  N/A\n",
+            "\n",
+            "FP-> 439 \n",
+            "FN-> 260 \n",
+            " Mislabeled-> 6\n"
+          ]
+        }
+      ],
+      "execution_count": 106,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615330126704
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# LOGISTIC REGRESSION CLASSIFER\r\n",
+        "lr = LogisticRegression(random_state=0)\r\n",
+        "lr.fit(X_train, y_train)\r\n",
+        "pred = lr.predict(X_test)\r\n",
+        "acc = calcAccuracy(y_test, pred)\r\n",
+        "#recall = recall_score(y_test, pred)\r\n",
+        "#precision = precision_score(y_test, pred)\r\n",
+        "PrintResults(\"Logistic Regression\", acc, \"N/A\", \"N/A\")\r\n",
+        "\r\n",
+        "false_negatives = FalseNegativesMultiClass(X_test, y_test, pred)\r\n",
+        "false_positives = FalsePositivesMultiClass(X_test, y_test, pred)\r\n",
+        "mislabeled = MislabeledMulitiClass(X_test,y_test,pred)\r\n",
+        "\r\n",
+        "print(f\"\\nFP-> {len(false_positives)} \\nFN-> {len(false_negatives)} \\nMislabeled-> {len(mislabeled)}\")"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Logistic Regression Classifier\n",
+            "Accuracy=  0.9434439498178875\n",
+            "Precision=  N/A\n",
+            "Recall=  N/A\n",
+            "\n",
+            "FP-> 75 \n",
+            "FN-> 479 \n",
+            "Mislabeled-> 5\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "/anaconda/envs/azureml_py36/lib/python3.6/site-packages/sklearn/linear_model/_logistic.py:940: ConvergenceWarning: lbfgs failed to converge (status=1):\n",
+            "STOP: TOTAL NO. of ITERATIONS REACHED LIMIT.\n",
+            "\n",
+            "Increase the number of iterations (max_iter) or scale the data as shown in:\n",
+            "    https://scikit-learn.org/stable/modules/preprocessing.html\n",
+            "Please also refer to the documentation for alternative solver options:\n",
+            "    https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression\n",
+            "  extra_warning_msg=_LOGISTIC_SOLVER_CONVERGENCE_MSG)\n"
+          ]
+        }
+      ],
+      "execution_count": 107,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615330131536
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# RANDOM FORREST\r\n",
+        "rfm = RandomForestClassifier().fit(X_train, y_train)\r\n",
+        "pred = rfm.predict(X_test)\r\n",
+        "acc = calcAccuracy(y_test, pred)\r\n",
+        "#recall = recall_score(y_test, pred)\r\n",
+        "#precision = precision_score(y_test, pred)\r\n",
+        "PrintResults(\"Random Forrest\", acc, \"N/A\", \"N/A\")\r\n",
+        "\r\n",
+        "false_negatives = FalseNegativesMultiClass(X_test, y_test, pred)\r\n",
+        "false_positives = FalsePositivesMultiClass(X_test, y_test, pred)\r\n",
+        "mislabeled = MislabeledMultiClass(X_test,y_test,pred)\r\n",
+        "\r\n",
+        "print(f\"\\nFP-> {len(false_positives)} \\nFN-> {len(false_negatives)} \\nMislabeled-> {len(mislabeled)}\")"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Random Forrest Classifier\n",
+            "Accuracy=  0.9531566167543505\n",
+            "Precision=  N/A\n",
+            "Recall=  N/A\n",
+            "\n",
+            "FP-> 126 \n",
+            "FN-> 332 \n",
+            "Mislabeled-> 5\n"
+          ]
+        }
+      ],
+      "execution_count": 108,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615330139902
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# NAIVE BAYS\r\n",
+        "nb = GaussianNB().fit(X_train, y_train)\r\n",
+        "pred = nb.predict(X_test)\r\n",
+        "acc = calcAccuracy(y_test, pred)\r\n",
+        "#recall = recall_score(y_test, pred)\r\n",
+        "#precision = precision_score(y_test, pred)\r\n",
+        "PrintResults(\"Naive Bays\", acc, \"N/A\", \"N/A\")\r\n",
+        "\r\n",
+        "false_negatives = FalseNegativesMultiClass(X_test, y_test, pred)\r\n",
+        "false_positives = FalsePositivesMultiClass(X_test, y_test, pred)\r\n",
+        "mislabeled = MislabeledMulitiClass(X_test,y_test,pred)\r\n",
+        "\r\n",
+        "print(f\"\\nFP-> {len(false_positives)} \\nFN-> {len(false_negatives)} \\n Mislabeled-> {len(mislabeled)}\")"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Naive Bays Classifier\n",
+            "Accuracy=  0.8475313638203157\n",
+            "Precision=  N/A\n",
+            "Recall=  N/A\n",
+            "\n",
+            "FP-> 1176 \n",
+            "FN-> 263 \n",
+            " Mislabeled-> 68\n"
+          ]
+        }
+      ],
+      "execution_count": 109,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615330145780
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "clf = MLPClassifier(solver='sgd', alpha=1e-5,\r\n",
+        "                     hidden_layer_sizes=(5, 100), learning_rate_init = 0.15, random_state=1)\r\n",
+        "clf.fit(X_train, y_train)\r\n",
+        "pred = clf.predict(X_test)\r\n",
+        "print(\"class model performance: \" + str(accuracy_score(y_test, pred)*100) + \"%\")\r\n",
+        "print(\"class model recall score: \" + str(recall_score(y_test, pred, average = 'micro')*100) + \"%\")"
+      ],
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "class model performance: 95.22460542290571%\n",
+            "class model recall score: 95.22460542290571%\n"
+          ]
+        }
+      ],
+      "execution_count": 110,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1615331020508
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Try/Catch for recognizing if input is json or not\r\n",
+        "\r\n",
+        "#data_dict = list(map(lambda x : ast.literal_eval(x), data))\r\n",
+        "for x in dataset[:5]:\r\n",
+        "    print(x)\r\n",
+        "\r\n",
+        "for y in dataset:\r\n",
+        "    x = None\r\n",
+        "    try:\r\n",
+        "        x = ast.literal_eval(y[0])\r\n",
+        "        #print(f\"It didn't break! {x}\")\r\n",
+        "    except (ValueError, SyntaxError):\r\n",
+        "        z = True\r\n",
+        "        #print(f\"It broke:( {y}\") \r\n",
+        "\r\n"
+      ],
+      "outputs": [],
+      "execution_count": 15,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1606874741766
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "a = np.array([1,2,3,4,5,])\r\n",
+        "print(a)\r\n",
+        "print(a.reshape(1,-1))"
+      ],
+      "outputs": [],
+      "execution_count": null,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        },
+        "gather": {
+          "logged": 1607398433990
+        }
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [],
+      "outputs": [],
+      "execution_count": null,
+      "metadata": {
+        "collapsed": true,
+        "jupyter": {
+          "source_hidden": false,
+          "outputs_hidden": false
+        },
+        "nteract": {
+          "transient": {
+            "deleting": false
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "name": "python3-azureml",
+      "language": "python",
+      "display_name": "Python 3.6 - AzureML"
+    },
+    "language_info": {
+      "name": "python",
+      "version": "3.6.9",
+      "mimetype": "text/x-python",
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "pygments_lexer": "ipython3",
+      "nbconvert_exporter": "python",
+      "file_extension": ".py"
+    },
+    "kernel_info": {
+      "name": "python3-azureml"
+    },
+    "nteract": {
+      "version": "nteract-front-end@1.0.0"
+    },
+    "microsoft": {
+      "host": {
+        "AzureML": {
+          "notebookHasBeenCompleted": true
+        }
+      }
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 2
+}
