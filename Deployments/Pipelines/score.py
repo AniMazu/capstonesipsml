@@ -278,7 +278,7 @@ def ExtractFeatures(x):
 def init():
     global model
     # Get the path to the registered model file and load it
-    model_path = Model.get_model_path('ModelV2')
+    model_path = Model.get_model_path('PipelineModel')
     model = joblib.load(model_path)
 
 # Called when a request is received
